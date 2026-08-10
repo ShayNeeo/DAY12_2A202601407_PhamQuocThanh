@@ -40,10 +40,10 @@ services:
     image: ghcr.io/shayneeo/day12_2a202601407_phamquocthanh:latest
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      AGENT_API_KEY: ${AGENT_API_KEY}
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       - redis
     healthcheck:
@@ -59,6 +59,16 @@ services:
       - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - agent
+      - frontend
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: ghcr.io/shayneeo/day12_frontend:latest
+    ports:
+      - "8080:80"
     depends_on:
       - agent
     restart: unless-stopped

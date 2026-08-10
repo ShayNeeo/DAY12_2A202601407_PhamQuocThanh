@@ -66,8 +66,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Native Platform Image
-        id: build
+      - name: Build and Push Agent Image
+        id: build_agent
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -75,17 +75,39 @@ jobs:
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=ghcr.io/shayneeo/day12_2a202601407_phamquocthanh,push-by-digest=true,name-canonical=true,push=true
 
-      - name: Export digest
+      - name: Export agent digest
         run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          mkdir -p /tmp/digests-agent
+          digest="${{ steps.build_agent.outputs.digest }}"
+          touch "/tmp/digests-agent/${digest#sha256:}"
 
-      - name: Upload digest
+      - name: Upload agent digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.runner }}
-          path: /tmp/digests/*
+          name: digests-agent-${{ matrix.runner }}
+          path: /tmp/digests-agent/*
+          if-no-files-found: error
+
+      - name: Build and Push Frontend Image
+        id: build_frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=ghcr.io/shayneeo/day12_frontend,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export frontend digest
+        run: |
+          mkdir -p /tmp/digests-frontend
+          digest="${{ steps.build_frontend.outputs.digest }}"
+          touch "/tmp/digests-frontend/${digest#sha256:}"
+
+      - name: Upload frontend digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-frontend-${{ matrix.runner }}
+          path: /tmp/digests-frontend/*
           if-no-files-found: error
 
   merge:
@@ -107,18 +129,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Download digests
+      - name: Download agent digests
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
-          pattern: digests-*
+          path: /tmp/digests-agent
+          pattern: digests-agent-*
           merge-multiple: true
 
-      - name: Create Multi-Arch Manifest
-        working-directory: /tmp/digests
+      - name: Create Multi-Arch Manifest (Agent)
+        working-directory: /tmp/digests-agent
         run: |
-          echo "Merging native amd64 and arm64 images into multi-platform manifest..."
+          echo "Merging native amd64 and arm64 images into multi-platform manifest for agent..."
           docker buildx imagetools create -t ghcr.io/shayneeo/day12_2a202601407_phamquocthanh:latest -t ghcr.io/shayneeo/day12_2a202601407_phamquocthanh:${GITHUB_REF_NAME} $(printf 'ghcr.io/shayneeo/day12_2a202601407_phamquocthanh@sha256:%s ' *)
+
+      - name: Download frontend digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests-frontend
+          pattern: digests-frontend-*
+          merge-multiple: true
+
+      - name: Create Multi-Arch Manifest (Frontend)
+        working-directory: /tmp/digests-frontend
+        run: |
+          echo "Merging native amd64 and arm64 images into multi-platform manifest for frontend..."
+          docker buildx imagetools create -t ghcr.io/shayneeo/day12_frontend:latest -t ghcr.io/shayneeo/day12_frontend:${GITHUB_REF_NAME} $(printf 'ghcr.io/shayneeo/day12_frontend@sha256:%s ' *)
 
   deploy:
     name: Deploy Tagged Release to VPS
@@ -135,23 +170,27 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PASS: ${{ secrets.SSH_PASSWORD }}
-          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          CF_TUNNEL_TOKEN: ${{ secrets.CF_TUNNEL_TOKEN }}
+          DOTENV_FILE: ${{ secrets.DOTENV_FILE }}
         run: |
           echo "Deploying version ${GITHUB_REF_NAME} to VPS..."
           sudo apt-get update && sudo apt-get install -y sshpass
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           ssh-keyscan -p ${SSH_PORT} ${SSH_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
           
+          # Create deployment directory
           sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} "mkdir -p ~/day12-agent"
-          sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no -P ${SSH_PORT} docker-compose.yml ${SSH_USER}@${SSH_HOST}:~/day12-agent/docker-compose.yml
           
+          # Sync docker-compose.yml, stripping out local build configurations to force pulling from ghcr.io
+          cat docker-compose.yml | grep -v 'build:' > prod-docker-compose.yml
+          sshpass -p "${SSH_PASS}" scp -o StrictHostKeyChecking=no -P ${SSH_PORT} prod-docker-compose.yml ${SSH_USER}@${SSH_HOST}:~/day12-agent/docker-compose.yml
+          
+          # Inject full DOTENV_FILE into the VPS
           sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} "cat << 'EOF' > ~/day12-agent/.env
-          AGENT_API_KEY=${AGENT_API_KEY}
-          OPENAI_API_KEY=${OPENAI_API_KEY}
-          CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
-          EOF
+          ${DOTENV_FILE}
+          EOF"
+          
+          # Pull and restart the stack
+          sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} "
           cd ~/day12-agent
           docker compose pull
           docker compose up -d --remove-orphans"
