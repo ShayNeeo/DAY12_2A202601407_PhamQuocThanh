@@ -3,7 +3,7 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
-RUN npm install -g pnpm && pnpm install
+RUN npm install -g pnpm@9 && pnpm install
 
 COPY . .
 # We need to change the build script in package.json to generate static export
