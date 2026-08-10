@@ -70,6 +70,13 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+from fastapi.responses import JSONResponse, RedirectResponse
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/docs")
+
+
 # ─────────────────────────────────────────────────────────────
 # Health & readiness
 # ─────────────────────────────────────────────────────────────
