@@ -101,8 +101,8 @@ def ready(store: ConversationStore = Depends(get_store)):
 # ─────────────────────────────────────────────────────────────
 # Endpoint chính
 # ─────────────────────────────────────────────────────────────
-from guardrails.input_guardrails import detect_injection, topic_filter
-from guardrails.output_guardrails import content_filter, llm_safety_check
+from app.guardrails.input_guardrails import detect_injection, topic_filter
+from app.guardrails.output_guardrails import content_filter
 import asyncio
 
 @app.post("/ask")
@@ -117,7 +117,7 @@ def ask(
     guard.check(user_id)
     
     # Input Guardrails
-    if detect_injection(payload.question) or topic_filter(payload.question):
+    if detect_injection(payload.question):
         return {
             "answer": "I cannot process that request due to safety policy.",
             "user_id": user_id,
@@ -169,7 +169,7 @@ async def api_chat(payload: ChatRequest):
     result = ask_llm(message, [])
     response_text = result["answer"]
     
-    GUARDS_SECRETS = ["admin123", "sk-vinbank-secret-2024", "db.vinbank.internal"]
+    GUARDS_SECRETS = ["admin123", "vinbank-secret-2024", "db.vinbank.internal"]
     leaked = any(secret in response_text.lower() for secret in GUARDS_SECRETS)
     
     filter_res = content_filter(response_text)

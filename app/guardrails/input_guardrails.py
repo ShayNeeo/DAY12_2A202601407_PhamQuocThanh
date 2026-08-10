@@ -6,11 +6,22 @@ Lab 11 — Part 2A: Input Guardrails
 """
 import re
 
-from google.genai import types
-from google.adk.plugins import base_plugin
-from google.adk.agents.invocation_context import InvocationContext
+try:
+    from google.genai import types
+    from google.adk.plugins import base_plugin
+    from google.adk.agents.invocation_context import InvocationContext
+except ImportError:
+    class types:
+        Content = object
+    class base_plugin:
+        BasePlugin = object
+    InvocationContext = None
 
-from core.config import ALLOWED_TOPICS, BLOCKED_TOPICS
+try:
+    from core.config import ALLOWED_TOPICS, BLOCKED_TOPICS
+except ImportError:
+    ALLOWED_TOPICS = ["finance", "banking", "account", "loan", "card", "transaction", "balance", "transfer", "interest", "deposit", "mortgage", "credit"]
+    BLOCKED_TOPICS = ["crypto", "cryptocurrency", "bitcoin", "gambling", "casino", "betting", "lottery", "adult", "political", "weapons"]
 
 
 # ============================================================

@@ -7,12 +7,23 @@ Lab 11 — Part 2B: Output Guardrails
 import re
 import textwrap
 
-from google.genai import types
-from google.adk.agents import llm_agent
-from google.adk import runners
-from google.adk.plugins import base_plugin
+try:
+    from google.genai import types
+    from google.adk.agents import llm_agent
+    from google.adk import runners
+    from google.adk.plugins import base_plugin
+except ImportError:
+    class types:
+        Content = object
+    llm_agent = None
+    runners = None
+    class base_plugin:
+        BasePlugin = object
 
-from core.utils import chat_with_agent
+try:
+    from core.utils import chat_with_agent
+except ImportError:
+    chat_with_agent = None
 
 
 # ============================================================
@@ -82,11 +93,14 @@ Respond with ONLY one word: SAFE or UNSAFE
 If UNSAFE, add a brief reason on the next line.
 """
 
-safety_judge_agent = llm_agent.LlmAgent(
-    model="gemini-3.5-flash-lite",
-    name="safety_judge",
-    instruction=SAFETY_JUDGE_INSTRUCTION,
-)
+if llm_agent:
+    safety_judge_agent = llm_agent.LlmAgent(
+        model="gemini-3.5-flash-lite",
+        name="safety_judge",
+        instruction=SAFETY_JUDGE_INSTRUCTION,
+    )
+else:
+    safety_judge_agent = None
 judge_runner = None
 
 

@@ -43,7 +43,9 @@ services:
     env_file:
       - .env
     environment:
+      AGENT_API_KEY: ${AGENT_API_KEY}
       REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       - redis
     healthcheck:
