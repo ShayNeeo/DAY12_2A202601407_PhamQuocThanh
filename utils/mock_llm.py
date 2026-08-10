@@ -73,14 +73,18 @@ def ask_llm(question: str, history: list[dict] | None = None) -> dict:
                 "Authorization": f"Bearer {openai_key}",
                 "Content-Type": "application/json",
             }
+            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            if "gpt-5" in model_name or not model_name:
+                model_name = "gpt-4o-mini"
+
             payload = {
-                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "model": model_name,
                 "messages": messages,
                 "temperature": 0.5,
                 "max_tokens": 400,
             }
 
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=15.0) as client:
                 res = client.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers=headers,
@@ -102,7 +106,10 @@ def ask_llm(question: str, history: list[dict] | None = None) -> dict:
                         "tokens_out": tokens_out,
                         "cost_usd": round(cost, 8),
                     }
-        except Exception:
+                else:
+                    print(f"OpenAI API Error: {res.status_code} {res.text}")
+        except Exception as e:
+            print(f"LLM Call Exception: {e}")
             pass  # Trở về mock LLM nếu có lỗi mạng hoặc API
 
     # Fallback tất định (Mock LLM Template)
