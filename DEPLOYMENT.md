@@ -12,8 +12,8 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| Public URL | https://sgp1.w9.nu:8000 |
-| Platform | Railway / Custom VPS (Docker Compose) |
+| Public URL | https://lab12.w9.nu |
+| Platform | Railway / Custom VPS (Docker Compose & Cloudflare Tunnel) |
 | Ngày deploy | 2026-08-10 |
 
 ## Biến Môi Trường Đã Set Trên Cloud
@@ -22,41 +22,40 @@ Ghi tên biến và **nguồn giá trị**, không ghi giá trị:
 
 | Biến | Đã set | Ghi chú |
 |------|--------|---------|
-| `PORT` | ✅ | platform tự gán |
-| `AGENT_API_KEY` | ✅ | đặt trong dashboard, không nằm trong repo |
-| `REDIS_URL` | ✅ | Redis add-on / service redis:6379 |
+| `PORT` | ✅ | platform tự gán (default 8000) |
+| `AGENT_API_KEY` | ✅ | đặt trong dashboard/secrets, không nằm trong repo |
+| `REDIS_URL` | ✅ | service redis:6379 / redis://redis:6379/0 |
 | `RATE_LIMIT_PER_MINUTE` | ✅ | 10 |
 | `MONTHLY_BUDGET_USD` | ✅ | 10.0 |
 | `LOG_LEVEL` | ✅ | INFO |
+| `OPENAI_API_KEY` | ✅ | gpt-4o-mini API key |
 
 ## Lệnh Kiểm Tra
 
 ```bash
 # 1. Liveness — mong đợi 200 {"status":"ok"}
-curl -i https://sgp1.w9.nu:8000/health
+curl -i https://lab12.w9.nu/health
 
 # 2. Readiness — mong đợi 200 {"status":"ready"} (đã nối được Redis)
-curl -i https://sgp1.w9.nu:8000/ready
+curl -i https://lab12.w9.nu/ready
 
 # 3. Không có API key — mong đợi 401
-curl -i -X POST https://sgp1.w9.nu:8000/ask \
+curl -i -X POST https://lab12.w9.nu/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"question":"Hello"}'
+  -d '{"message":"Hello"}'
 
-# 4. Có API key — mong đợi 200 kèm câu trả lời
-curl -i -X POST https://sgp1.w9.nu:8000/ask \
+# 4. Có API key — mong đợi 200 kèm câu trả lời từ Real LLM
+curl -i -X POST https://lab12.w9.nu/api/chat \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $AGENT_API_KEY" \
-  -H "X-User-Id: sv-test" \
-  -d '{"question":"Deploy là gì?"}'
+  -d '{"message":"VinBank là gì?"}'
 
 # 5. Rate limit — gọi 15 lần, những lần cuối phải trả 429
 for i in $(seq 1 15); do
-  curl -s -o /dev/null -w "%{http_code} " -X POST https://sgp1.w9.nu:8000/ask \
+  curl -s -o /dev/null -w "%{http_code} " -X POST https://lab12.w9.nu/api/chat \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $AGENT_API_KEY" \
-    -H "X-User-Id: sv-test" \
-    -d '{"question":"test"}'
+    -d '{"message":"test"}'
 done; echo
 ```
 
@@ -77,7 +76,7 @@ content-type: application/json
 
 HTTP/1.1 200 OK
 content-type: application/json
-{"answer":"Deploy là quá trình đưa phần mềm từ môi trường phát triển (development) lên môi trường sản xuất (production) hoặc môi trường thử nghiệm (staging) để người dùng có thể truy cập và sử dụng.","user_id":"sv-test","history_length":0,"cost_usd":0.00015,"tokens":{"in":25,"out":45}}
+{"response":"VinBank is a virtual banking service designed to provide you with a range of financial solutions...","leaked":false,"status":"SAFE"}
 
 200 200 200 200 200 200 200 200 200 200 429 429 429 429 429
 ```
