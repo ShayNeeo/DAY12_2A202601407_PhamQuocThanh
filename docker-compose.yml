@@ -37,11 +37,13 @@ services:
   # TODO (CP2): khai báo service `agent` ở đây
   agent:
     build: .
+    image: ghcr.io/shayneeo/day12_2a202601407_phamquocthanh:latest
     ports:
       - "8000:8000"
     environment:
       AGENT_API_KEY: ${AGENT_API_KEY}
       REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       - redis
     healthcheck:
@@ -49,6 +51,15 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - agent
+    restart: unless-stopped
 
 volumes:
   redis-data:
