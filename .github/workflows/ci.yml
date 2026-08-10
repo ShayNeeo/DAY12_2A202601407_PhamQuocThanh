@@ -170,6 +170,7 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PASS: ${{ secrets.SSH_PASSWORD }}
+          CF_TUNNEL_TOKEN: ${{ secrets.CF_TUNNEL_TOKEN }}
           DOTENV_FILE: ${{ secrets.DOTENV_FILE }}
         run: |
           echo "Deploying version ${GITHUB_REF_NAME} to VPS..."
@@ -187,6 +188,7 @@ jobs:
           # Inject full DOTENV_FILE into the VPS
           sshpass -p "${SSH_PASS}" ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} "cat << 'EOF' > ~/day12-agent/.env
           ${DOTENV_FILE}
+          CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
           EOF"
           
           # Pull and restart the stack
